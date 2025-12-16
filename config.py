@@ -11,11 +11,11 @@ All configurable constants in one place for easy tuning.
 MAX_IMAGE_SIZE = 640  # Longest side in pixels
 
 # DBSCAN Clustering
-DBSCAN_EPS = 0.6  # Increased to merge duplicates better
+DBSCAN_EPS = 0.7  # Increased to merge duplicates better
 DBSCAN_MIN_SAMPLES = 3  # Minimum 3 faces to form a person group
 
 # Detection Quality
-DET_CONF_THRESH = 0.60
+DET_CONF_THRESH = 0.50
 
 
 # UI Configuration
@@ -26,3 +26,6 @@ DEFAULT_EXPANDED_GROUPS = 3
 # Supported file formats
 SUPPORTED_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
 SUPPORTED_UPLOAD_TYPES = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'zip']
+
+MAX_RAM_IMAGES = 100
+MAX_RAM_SIZE_MB = 1000  #
