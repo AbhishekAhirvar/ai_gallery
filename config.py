@@ -3,22 +3,26 @@ VowScan Configuration
 All configurable constants in one place for easy tuning.
 """
 
-# DeepFace Configuration
-FACE_MODEL = "Facenet512"
-DETECTOR_BACKEND = "opencv"
-ENFORCE_DETECTION = True
+# InsightFace Configuration
+# Models are downloaded automatically by InsightFace
+
 
 # Image Processing
 MAX_IMAGE_SIZE = 640  # Longest side in pixels
 
 # DBSCAN Clustering
-DBSCAN_EPS = 0.4
-DBSCAN_MIN_SAMPLES = 2
+DBSCAN_EPS = 0.6  # Increased to merge duplicates better
+DBSCAN_MIN_SAMPLES = 3  # Minimum 3 faces to form a person group
+
+# Detection Quality
+DET_CONF_THRESH = 0.60
+
 
 # UI Configuration
 GALLERY_COLUMNS = 4
 DEFAULT_EXPANDED_GROUPS = 3
 
 # Supported file formats
-SUPPORTED_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png')
-SUPPORTED_UPLOAD_TYPES = ['jpg', 'jpeg', 'png', 'zip']
+# Supported file formats
+SUPPORTED_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp')
+SUPPORTED_UPLOAD_TYPES = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'zip']

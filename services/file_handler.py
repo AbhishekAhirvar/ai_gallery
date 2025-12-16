@@ -100,9 +100,13 @@ class FileHandler:
         """Store image data for later retrieval."""
         self._image_store[filename] = data
     
-    def get_image(self, filename: str) -> Optional[bytes]:
-        """Retrieve stored image data."""
+    def get_image(self, filename: str) -> bytes:
+        """Retrieve image bytes."""
         return self._image_store.get(filename)
+
+    def get_image_bytes(self, filename: str) -> bytes:
+        """Alias for get_image."""
+        return self.get_image(filename)
     
     def get_all_images(self) -> Dict[str, bytes]:
         """Get all stored images."""
