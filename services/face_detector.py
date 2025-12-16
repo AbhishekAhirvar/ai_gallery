@@ -1,48 +1,58 @@
 """
 Face Detection Service for VowScan.
-Wraps DeepFace for face detection and embedding extraction.
+Wraps InsightFace for high-quality face detection and embedding extraction.
+Uses 'buffalo_l' model pack.
 """
 
 import os
-import tempfile
-from typing import List, Optional
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
-from deepface import DeepFace
-
-from config import FACE_MODEL, DETECTOR_BACKEND, ENFORCE_DETECTION
-
+import insightface
+from insightface.app import FaceAnalysis
+from dataclasses import dataclass
+from typing import List
+import streamlit as st
+from config import DET_CONF_THRESH
 
 @dataclass
 class FaceEmbedding:
     """Represents a face embedding with metadata."""
     embedding: np.ndarray
     filename: str
-    face_index: int = 0  # For images with multiple faces
+    face_index: int = 0
+    confidence: float = 0.0
+    facial_area: dict = None  # x, y, w, h
+    thumbnail_path: str = None
+
+
+@st.cache_resource
+def get_face_analyser():
+    """
+    Initialize and cache the InsightFace model.
+    """
+    # Initialize InsightFace with buffalo_l model
+    app = FaceAnalysis(name='buffalo_l')
+    
+    # Auto-detect context: 0 for GPU, -1 for CPU
+    # We try 0 first if ONNX Runtime GPU is available
+    try:
+        app.prepare(ctx_id=0, det_size=(640, 640))
+    except Exception:
+        app.prepare(ctx_id=-1, det_size=(640, 640))
+        
+    return app
 
 
 class FaceDetector:
     """
-    Service for detecting faces and extracting embeddings.
-    Uses DeepFace with configurable model and detector backend.
+    Service for detecting faces and extracting embeddings using InsightFace.
     """
     
-    def __init__(
-        self,
-        model_name: str = FACE_MODEL,
-        detector_backend: str = DETECTOR_BACKEND
-    ):
-        self.model_name = model_name
-        self.detector_backend = detector_backend
-        self._temp_dir = None
-    
-    def _get_temp_dir(self) -> str:
-        """Get or create temporary directory for processing."""
-        if self._temp_dir is None or not os.path.exists(self._temp_dir):
-            self._temp_dir = tempfile.mkdtemp(prefix="vowscan_face_")
-        return self._temp_dir
+    def __init__(self):
+        self.app = get_face_analyser()
+        self._thumbnails_dir = "thumbnails"
+        if not os.path.exists(self._thumbnails_dir):
+            os.makedirs(self._thumbnails_dir)
     
     def extract_embeddings(
         self,
@@ -57,41 +67,70 @@ class FaceDetector:
             filename: Original filename for reference
             
         Returns:
-            List of FaceEmbedding objects (empty if no faces found)
+            List of FaceEmbedding objects
         """
-        # Save image temporarily for DeepFace
-        temp_path = os.path.join(self._get_temp_dir(), "temp_face.jpg")
-        cv2.imwrite(temp_path, img)
-        
         try:
-            embeddings = DeepFace.represent(
-                img_path=temp_path,
-                model_name=self.model_name,
-                detector_backend=self.detector_backend,
-                enforce_detection=ENFORCE_DETECTION
-            )
+            # InsightFace expects BGR image (OpenCV format)
+            faces = self.app.get(img)
             
-            return [
-                FaceEmbedding(
-                    embedding=np.array(emb['embedding']),
-                    filename=filename,
-                    face_index=idx
+            embeddings_list = []
+            
+            for idx, face in enumerate(faces):
+                # InsightFace Face object attributes:
+                # bbox: [x1, y1, x2, y2]
+                # embedding: (512,)
+                # det_score: float
+                
+                bbox = face.bbox.astype(int)
+                x1, y1, x2, y2 = bbox
+
+                # Quality Gate
+                if face.det_score < DET_CONF_THRESH:
+                    continue
+                
+                w_box = x2 - x1
+                h_box = y2 - y1
+                
+                if w_box <= 0 or h_box <= 0:
+                    continue
+                
+                # Thumbnail generation with padding
+                h_img, w_img, _ = img.shape
+                pad_w = int(w_box * 0.2)
+                pad_h = int(h_box * 0.2)
+                
+                tx1 = max(0, x1 - pad_w)
+                ty1 = max(0, y1 - pad_h)
+                tx2 = min(w_img, x2 + pad_w)
+                ty2 = min(h_img, y2 + pad_h)
+                
+                face_crop = img[ty1:ty2, tx1:tx2]
+                
+                thumb_path = None
+                if face_crop.size > 0:
+                    safe_filename = filename.replace('.', '_')
+                    thumb_filename = f"thumb_{safe_filename}_{idx}.jpg"
+                    thumb_path = os.path.join(self._thumbnails_dir, thumb_filename)
+                    cv2.imwrite(thumb_path, face_crop)
+                
+                embeddings_list.append(
+                    FaceEmbedding(
+                        embedding=face.embedding,
+                        filename=filename,
+                        face_index=idx,
+                        confidence=float(face.det_score),
+                        facial_area={'x': int(x1), 'y': int(y1), 'w': int(w_box), 'h': int(h_box)},
+                        thumbnail_path=thumb_path
+                    )
                 )
-                for idx, emb in enumerate(embeddings)
-            ]
+                
+            return embeddings_list
             
-        except Exception:
-            # No face detected or other error
+        except Exception as e:
+            # print(f"Processing error: {e}")
             return []
-        
-        finally:
-            # Cleanup temp file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
     
     def cleanup(self):
-        """Clean up temporary resources."""
-        if self._temp_dir and os.path.exists(self._temp_dir):
-            import shutil
-            shutil.rmtree(self._temp_dir, ignore_errors=True)
-            self._temp_dir = None
+        """Cleanup resources if needed."""
+        # Models are cached, nothing specific to clean
+        pass

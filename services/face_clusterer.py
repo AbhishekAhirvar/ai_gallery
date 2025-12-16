@@ -3,7 +3,7 @@ Face Clustering Service for VowScan.
 Groups face embeddings into person clusters using DBSCAN.
 """
 
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 from dataclasses import dataclass
 
 import numpy as np
@@ -18,6 +18,8 @@ class PersonCluster:
     """Represents a cluster of faces belonging to one person."""
     label: str
     filenames: List[str]
+    thumbnail_path: str = None
+    embeddings: List[FaceEmbedding] = None
     
     @property
     def photo_count(self) -> int:
@@ -57,7 +59,7 @@ class FaceClusterer:
         # Ensure valid range [0, 2]
         return np.clip(distance, 0, 2)
     
-    def cluster(self, face_embeddings: List[FaceEmbedding]) -> List[PersonCluster]:
+    def cluster(self, face_embeddings: List[FaceEmbedding]) -> Tuple[List[PersonCluster], List[FaceEmbedding]]:
         """
         Cluster face embeddings into person groups.
         
@@ -65,10 +67,10 @@ class FaceClusterer:
             face_embeddings: List of FaceEmbedding objects
             
         Returns:
-            List of PersonCluster objects, sorted by cluster size
+            Tuple: (List of PersonCluster, List of unclustered FaceEmbedding objects)
         """
         if not face_embeddings:
-            return []
+            return [], []
         
         # Extract embeddings and filenames
         embeddings = np.array([fe.embedding for fe in face_embeddings])
@@ -86,47 +88,49 @@ class FaceClusterer:
         labels = clustering.fit_predict(distance_matrix)
         
         # Group by cluster label
-        cluster_files: Dict[int, Set[str]] = {}
-        noise_files: List[str] = []
+        cluster_data: Dict[int, List[FaceEmbedding]] = {}
+        unclustered_embeddings: List[FaceEmbedding] = []
         
-        for filename, label in zip(filenames, labels):
+        for i, label in enumerate(labels):
+            fe = face_embeddings[i]
             if label == -1:
-                # Noise point - treat as individual
-                noise_files.append(filename)
+                unclustered_embeddings.append(fe)
             else:
-                if label not in cluster_files:
-                    cluster_files[label] = set()
-                cluster_files[label].add(filename)
+                if label not in cluster_data:
+                    cluster_data[label] = []
+                cluster_data[label].append(fe)
         
         # Build result list
         clusters = []
         person_idx = 1
         
-        # Add proper clusters first (sorted by size, descending)
-        sorted_clusters = sorted(
-            cluster_files.items(),
-            key=lambda x: len(x[1]),
+        # Sort clusters by size
+        sorted_labels = sorted(
+            cluster_data.keys(),
+            key=lambda l: len(cluster_data[l]),
             reverse=True
         )
         
-        for _, files in sorted_clusters:
+        for label in sorted_labels:
+            group_embeddings = cluster_data[label]
+            unique_filenames = list(set(fe.filename for fe in group_embeddings))
+            
+            # Additional check: Min samples check
+            if len(unique_filenames) < self.min_samples:
+                # Treat as unclustered
+                unclustered_embeddings.extend(group_embeddings)
+                continue
+                
+            # Pick a thumbnail
+            thumb_path = group_embeddings[0].thumbnail_path
+            
             clusters.append(PersonCluster(
                 label=f"Person {person_idx}",
-                filenames=list(files)
+                filenames=unique_filenames,
+                thumbnail_path=thumb_path,
+                embeddings=group_embeddings
             ))
             person_idx += 1
         
-        # Add noise points as individual persons
-        for filename in noise_files:
-            # Check if this file is already in a cluster (from multiple faces)
-            already_clustered = any(
-                filename in c.filenames for c in clusters
-            )
-            if not already_clustered:
-                clusters.append(PersonCluster(
-                    label=f"Person {person_idx}",
-                    filenames=[filename]
-                ))
-                person_idx += 1
-        
-        return clusters
+        return clusters, unclustered_embeddings
+
