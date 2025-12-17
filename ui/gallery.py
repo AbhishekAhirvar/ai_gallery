@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import cv2
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from services.face_clusterer import PersonCluster
 from services.file_handler import FileHandler
@@ -19,6 +19,29 @@ def get_cached_thumbnail(path: str) -> Optional[str]:
             b64 = base64.b64encode(f.read()).decode('utf-8')
             return f"data:image/jpeg;base64,{b64}"
     return None
+
+@st.cache_data(show_spinner=False)
+def _get_grid_data(cluster_info: List[Tuple[str, str, int]]) -> Tuple[List[str], List[str]]:
+    """
+    Prepare base64 images for the grid. Cached to avoid processing on every rerun.
+    cluster_info: List of (label, thumbnail_path, count)
+    """
+    images_urls = []
+    labels = []
+    
+    for label, thumb_path, count in cluster_info:
+        img_src = "https://placehold.co/200x200?text=?"
+        
+        # Use the specific cached thumbnail loader
+        cached_src = get_cached_thumbnail(thumb_path)
+        if cached_src:
+            img_src = cached_src
+        
+        images_urls.append(img_src)
+        labels.append(f"{label} ({count})")
+        
+    return images_urls, labels
+
 
 def render_gallery(
     clusters: List[PersonCluster], 
@@ -75,23 +98,17 @@ def render_gallery(
         st.info("No people found.")
         return
 
-    # Prepare data for clickable images
-    images_urls = []
-    labels = []
-    
-    for cluster in clusters:
-        thumb_path = cluster.thumbnail_path
-        img_src = "https://placehold.co/200x200?text=?"
-        
-        cached_src = get_cached_thumbnail(thumb_path)
-        if cached_src:
-            img_src = cached_src
-        
-        images_urls.append(img_src)
-        labels.append(f"{cluster.label} ({len(cluster.filenames)})")
+    # Prepare data using Cache
+    # We pass simple types (tuples) to be friendly to hashing
+    cluster_info = [(c.label, c.thumbnail_path, len(c.filenames)) for c in clusters]
+    images_urls, labels = _get_grid_data(cluster_info)
 
     # Render grid using clickable_images
-    if images_urls:
+    # OPTIMIZATION: If Modal is open, DO NOT render the heavy grid background.
+    # This saves massive bandwidth and fixes the "stuck loading" issue during navigation.
+    if st.session_state.get('active_album_cluster') or st.session_state.get('active_unidentified'):
+        st.info("Viewing Album... (Background hidden for performance)")
+    elif images_urls:
         clicked_index = clickable_images(
             images_urls, 
             titles=labels,
@@ -376,9 +393,10 @@ def view_album_dialog():
 
 
 @st.dialog("Unidentified Photos", width="large")
+@st.dialog("Unidentified Photos", width="large")
 def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[FaceEmbedding], file_handler: FileHandler):
     """
-    Modal dialog for unidentified photos with overlay boxes.
+    Modal dialog for unidentified photos with overlay boxes and naming.
     """
     c1, c2 = st.columns([8, 2])
     c1.header("Unidentified Photos")
@@ -386,8 +404,9 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
         st.session_state.active_unidentified = False
         st.rerun()
     
-    st.info("🟥 Red boxes indicate faces that were detected but not grouped (low quality or not enough matches).")
+    st.info("🟥 Red boxes indicate faces that were detected but not grouped.")
     
+    # --- Download ---
     zip_buf = file_handler.create_zip(filenames, "unidentified")
     st.download_button(
         "📥 Download All",
@@ -399,7 +418,79 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
     
     st.divider()
     
-    col_count = 3
+    # --- 1. Identify People (Manual Assignment) ---
+    st.markdown("### 🏷️ Name Unidentified Faces")
+    st.caption("Give a name to move them into a folder.")
+    
+    # We use a form to avoid rerun loops on every character
+    with st.form("naming_form"):
+        # Grid layout for faces
+        cols = st.columns(4)
+        
+        # Sort by filename to group faces from same image
+        sorted_faces = sorted(unclustered_embeddings, key=lambda x: x.filename)
+        
+        assigned_names = {} # Map index -> name
+        
+        for idx, fe in enumerate(sorted_faces):
+            col = cols[idx % 4]
+            with col:
+                # Show thumb
+                if fe.thumbnail_path and os.path.exists(fe.thumbnail_path):
+                     # Read file directly
+                    with open(fe.thumbnail_path, "rb") as f:
+                        import base64
+                        b64 = base64.b64encode(f.read()).decode('utf-8')
+                        st.markdown(f'<img src="data:image/jpeg;base64,{b64}" style="width:100%; border-radius:5px;">', unsafe_allow_html=True)
+                
+                # Input
+                name = st.text_input("Name", key=f"input_{fe.filename}_{fe.face_index}", placeholder="Unknown")
+                if name:
+                    assigned_names[idx] = name
+        
+        if st.form_submit_button("Save & Move Faces", use_container_width=True):
+            # Process assignments
+            clusters = st.session_state.clusters
+            
+            faces_to_remove = []
+            
+            for idx, new_name in assigned_names.items():
+                fe = sorted_faces[idx]
+                
+                # Check if cluster exists
+                target_cluster = next((c for c in clusters if c.label.lower() == new_name.lower()), None)
+                
+                if target_cluster:
+                    # Add to existing
+                    if fe.filename not in target_cluster.filenames:
+                        target_cluster.filenames.append(fe.filename)
+                    target_cluster.embeddings.append(fe)
+                else:
+                    # Create new
+                    new_cluster = PersonCluster(
+                        label=new_name,
+                        filenames=[fe.filename],
+                        thumbnail_path=fe.thumbnail_path,
+                        embeddings=[fe]
+                    )
+                    clusters.append(new_cluster)
+                
+                faces_to_remove.append(fe)
+            
+            # Update Session State
+            # Remove processed faces from unclustered list
+            for fe in faces_to_remove:
+                if fe in st.session_state.unclustered_embeddings:
+                    st.session_state.unclustered_embeddings.remove(fe)
+            
+            st.success(f"Moved {len(faces_to_remove)} faces!")
+            st.rerun()
+
+    st.divider()
+
+    # --- 2. View Full Images with Boxes ---
+    st.markdown("### 🖼️ Full Images")
+    col_count = 2
     rows = [filenames[i:i + col_count] for i in range(0, len(filenames), col_count)]
     
     for row in rows:
@@ -407,32 +498,37 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
         for i, filename in enumerate(row):
             with cols[i]:
                 # Get raw byte data
-                image_bytes = file_handler.get_image_bytes(filename) # need bytes for opencv/pil
+                image_bytes = file_handler.get_image_bytes(filename)
                 if not image_bytes:
                     continue
                     
                 # Decode for drawing
-                # We need a robust way to draw. Use opencv (numpy)
                 from utils.image_utils import decode_image
                 img_bgr = decode_image(image_bytes)
                 
                 if img_bgr is not None:
-                    # Find embeddings for this file
+                    # Draw boxes with CORRECT SCALING
+                    h_orig, w_orig = img_bgr.shape[:2]
+                    max_dim = max(h_orig, w_orig)
+                    # Detection was done at MAX_IMAGE_SIZE (1280)
+                    # Coordinates are relative to 1280px image
+                    scale = max_dim / 1280.0
+                    
                     faces_in_file = [fe for fe in unclustered_embeddings if fe.filename == filename]
                     
-                    # Draw boxes
                     for fe in faces_in_file:
                         if fe.facial_area:
-                            x = fe.facial_area['x']
-                            y = fe.facial_area['y']
-                            w = fe.facial_area['w']
-                            h = fe.facial_area['h']
-                            # Draw rectangle (Red in BGR is 0,0,255)
-                            cv2.rectangle(img_bgr, (x, y), (x+w, y+h), (0, 0, 255), 4)
+                            x = int(fe.facial_area['x'] * scale)
+                            y = int(fe.facial_area['y'] * scale)
+                            w = int(fe.facial_area['w'] * scale)
+                            h = int(fe.facial_area['h'] * scale)
+                            
+                            # Draw rectangle (Red)
+                            cv2.rectangle(img_bgr, (x, y), (x+w, y+h), (0, 0, 255), max(4, int(4*scale)))
                             
                     # Convert BGR to RGB for Streamlit
                     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-                    st.image(img_rgb, width='stretch')
+                    st.image(img_rgb, width="stretch")
                 else:
                     st.error("Error loading image")
 

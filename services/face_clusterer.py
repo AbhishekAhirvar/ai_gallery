@@ -47,9 +47,16 @@ class FaceClusterer:
         if not faces: return None
         best_path = faces[0].thumbnail_path
         
+        scanned_count = 0
+        limit = 50 # Heuristic: Don't scan entire cluster if it's huge
+        
         for face in faces:
             if face.thumbnail_path is None: continue
             
+            scanned_count += 1
+            if scanned_count > limit:
+                break
+                
             # 1. Size Score (Larger is better, usually less blurry)
             w = face.facial_area['w']
             h = face.facial_area['h']
@@ -68,15 +75,9 @@ class FaceClusterer:
                 d_r = np.linalg.norm(r_eye - nose)
                 
                 # Ratio of closer eye dist to further eye dist
-                # If perfectly frontal, d_l == d_r -> ratio = 1.0
-                # If side profile, one is very small -> ratio -> 0.0
                 yaw_score = min(d_l, d_r) / (max(d_l, d_r) + 1e-6)
             
             # 3. Composite Score
-            # We prioritize Frontality first, then Size.
-            # Yaw is 0.0-1.0. Size is pixels (e.g. 10000 - 40000).
-            # We want to penalize bad yaw heavily.
-            
             # If yaw < 0.4, it's a hard profile. Penalize.
             yaw_factor = yaw_score if yaw_score > 0.4 else yaw_score * 0.1
             
@@ -85,6 +86,11 @@ class FaceClusterer:
             if score > best_score:
                 best_score = score
                 best_path = face.thumbnail_path
+                
+            # Optimization: If we found a "Great" face, stop early
+            # Criteria: Reasonable size (e.g. 150x150=22500) and Good Frontality (>0.8) and High Conf
+            if size_score > 15000 and yaw_score > 0.8 and face.confidence > 0.7:
+                break
                 
         return best_path
     
