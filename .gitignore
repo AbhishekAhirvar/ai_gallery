@@ -9,7 +9,8 @@ thumbnails/
 
 # C extensions
 *.so
-
+thumbnails/
+.venv/
 # Distribution / packaging
 .Python
 build/
