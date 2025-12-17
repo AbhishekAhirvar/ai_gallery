@@ -45,8 +45,38 @@ class FileHandler:
             self._thumb_store[filename] = thumb_data
 
     def get_medium_image(self, filename: str) -> Optional[bytes]:
-        """Get best resolution for viewing. Now returns Original as Medium generation is skipped."""
-        return self.get_image(filename)
+        """Get 1080p version. Generates on fly if missing to speed up transfer."""
+        print(f"DEBUG: Requesting medium image for {filename}")
+        # Lazy init
+        if not hasattr(self, '_medium_store'): self._medium_store = {}
+        
+        # Try cache
+        if filename in self._medium_store:
+            print("DEBUG: Found in medium cache")
+            return self._medium_store[filename]
+            
+        # Lazy generate from Original
+        original = self.get_image(filename)
+        if original:
+            print("DEBUG: Generating medium from original...")
+            try:
+                # We need to resize for performance (sending 5MB original is slow)
+                img = decode_image(original)
+                if img is not None:
+                    img_medium = resize_image(img, max_size=1920)
+                    medium_data = encode_image(img_medium)
+                    # Cache in RAM
+                    self._medium_store[filename] = medium_data
+                    print("DEBUG: Generation successful")
+                    return medium_data
+            except Exception as e:
+                print(f"DEBUG: Generation failed: {e}")
+                pass
+        else:
+            print("DEBUG: Original not found!")
+        
+        # Fallback to original if resizing fails
+        return original
 
     def get_thumbnail_image(self, filename: str) -> Optional[bytes]:
         """Get 300px version. Generates on fly if missing."""
