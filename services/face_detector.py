@@ -22,6 +22,7 @@ class FaceEmbedding:
     face_index: int = 0
     confidence: float = 0.0
     facial_area: dict = None  # x, y, w, h
+    landmarks: np.ndarray = None # 5 keypoints
     thumbnail_path: str = None
 
 
@@ -94,15 +95,22 @@ class FaceDetector:
                 if w_box <= 0 or h_box <= 0:
                     continue
                 
-                # Thumbnail generation with padding
+                # Thumbnail generation with padding (Squarish for better avatar look)
                 h_img, w_img, _ = img.shape
-                pad_w = int(w_box * 0.2)
-                pad_h = int(h_box * 0.2)
                 
-                tx1 = max(0, x1 - pad_w)
-                ty1 = max(0, y1 - pad_h)
-                tx2 = min(w_img, x2 + pad_w)
-                ty2 = min(h_img, y2 + pad_h)
+                # Calculate center and max dimension
+                cx = x1 + w_box // 2
+                cy = y1 + h_box // 2
+                max_dim = max(w_box, h_box)
+                
+                # Add 10% padding for tight face focus
+                context_size = int(max_dim * 1.1)
+                half_size = context_size // 2
+                
+                tx1 = max(0, cx - half_size)
+                ty1 = max(0, cy - half_size)
+                tx2 = min(w_img, cx + half_size)
+                ty2 = min(h_img, cy + half_size)
                 
                 face_crop = img[ty1:ty2, tx1:tx2]
                 
@@ -120,6 +128,7 @@ class FaceDetector:
                         face_index=idx,
                         confidence=float(face.det_score),
                         facial_area={'x': int(x1), 'y': int(y1), 'w': int(w_box), 'h': int(h_box)},
+                        landmarks=face.kps,
                         thumbnail_path=thumb_path
                     )
                 )

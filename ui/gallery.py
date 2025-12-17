@@ -1,6 +1,7 @@
 from streamlit_clickable_images import clickable_images
 from utils.image_utils import encode_image_to_base64
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import cv2
 from typing import List, Dict, Optional
@@ -8,6 +9,16 @@ from typing import List, Dict, Optional
 from services.face_clusterer import PersonCluster
 from services.file_handler import FileHandler
 from services.face_detector import FaceEmbedding
+
+@st.cache_data(show_spinner=False)
+def get_cached_thumbnail(path: str) -> Optional[str]:
+    """Cache the base64 encoding of thumbnails to prevent disk I/O on every rerun."""
+    if path and os.path.exists(path):
+        with open(path, "rb") as f:
+            import base64
+            b64 = base64.b64encode(f.read()).decode('utf-8')
+            return f"data:image/jpeg;base64,{b64}"
+    return None
 
 def render_gallery(
     clusters: List[PersonCluster], 
@@ -19,6 +30,23 @@ def render_gallery(
     Render gallery with clickable images.
     """
     # --- PERSISTENT DIALOG LOGIC ---
+    
+    # Global Gallery CSS (Hover effects)
+    st.markdown("""
+    <style>
+    img {
+        opacity: 1 !important;
+        animation: none !important;
+        transition: transform 0.2s ease !important;
+        filter: none !important;
+    }
+    img:hover {
+        transform: scale(1.05);
+        opacity: 1 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     if st.session_state.get('active_album_cluster'):
         # Ensure we are viewing the correct cluster object (sync with list)
         label = st.session_state.active_album_cluster.label
@@ -48,14 +76,6 @@ def render_gallery(
         return
 
     # Prepare data for clickable images
-    # We'll use CSS to style the captions (names) overlay or below?
-    # clickable_images allows simple img tags. Styling caption is tricky inside the component.
-    # Actually, clickable_images just renders images.
-    # To show names, we might want to stick to the grid OR use the 'titles' feature if available?
-    # The standard library is simple.
-    # Workaround: Use div with image and text inside the HTML passed to clickable_images.
-    
-    # Prepare data for clickable images
     images_urls = []
     labels = []
     
@@ -63,12 +83,9 @@ def render_gallery(
         thumb_path = cluster.thumbnail_path
         img_src = "https://placehold.co/200x200?text=?"
         
-        if thumb_path and os.path.exists(thumb_path):
-             # Read file directly
-            with open(thumb_path, "rb") as f:
-                import base64
-                b64 = base64.b64encode(f.read()).decode('utf-8')
-                img_src = f"data:image/jpeg;base64,{b64}"
+        cached_src = get_cached_thumbnail(thumb_path)
+        if cached_src:
+            img_src = cached_src
         
         images_urls.append(img_src)
         labels.append(f"{cluster.label} ({len(cluster.filenames)})")
@@ -145,10 +162,65 @@ def view_album_dialog():
             st.session_state.album_selected_image = None
             st.rerun()
             
-        # Full Image
-        img_data = file_handler.get_image(filename)
-        if img_data:
-            st.image(img_data, use_container_width=True)
+        # Navigation & Image Display
+        try:
+            current_idx = cluster.filenames.index(filename)
+            total_imgs = len(cluster.filenames)
+        except ValueError:
+            current_idx = 0
+            total_imgs = 0
+            
+        c_prev, c_main, c_next = st.columns([1, 12, 1], vertical_alignment="center")
+        
+        with c_prev:
+            if st.button("◀", key="nav_prev", use_container_width=True):
+                prev_idx = (current_idx - 1) % total_imgs
+                st.session_state.album_selected_image = cluster.filenames[prev_idx]
+                st.rerun()
+                
+        with c_next:
+            if st.button("▶", key="nav_next", use_container_width=True):
+                next_idx = (current_idx + 1) % total_imgs
+                st.session_state.album_selected_image = cluster.filenames[next_idx]
+                st.rerun()
+
+        # Keyboard Navigation (JS Injection)
+        components.html("""
+        <script>
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') {
+                const buttons = Array.from(window.parent.document.querySelectorAll('button'));
+                const prevBtn = buttons.find(el => el.innerText === "◀");
+                if (prevBtn) prevBtn.click();
+            }
+            if (e.key === 'ArrowRight') {
+                const buttons = Array.from(window.parent.document.querySelectorAll('button'));
+                const nextBtn = buttons.find(el => el.innerText === "▶");
+                if (nextBtn) nextBtn.click();
+            }
+        });
+        </script>
+        """, height=0, width=0)
+        
+        with c_main:
+            # Full Image (Medium Optimized)
+            img_data = file_handler.get_medium_image(filename)
+            if not img_data:
+                img_data = file_handler.get_image(filename) # Fallback to original
+                
+            if img_data:
+                st.image(img_data, width="stretch")
+                
+                # Download Option
+                original_data = file_handler.get_image(filename)
+                if original_data:
+                    st.download_button(
+                        label="⬇ Download Original",
+                        data=original_data,
+                        file_name=filename,
+                        mime="image/jpeg",
+                        use_container_width=True
+                    )
             
         st.markdown("### 👥 People in this photo")
         
@@ -161,7 +233,6 @@ def view_album_dialog():
         if not people_in_photo:
             st.caption("No other identified people found.")
         else:
-
             # Render thumbnails for people
             people_urls = []
             people_titles = []
@@ -174,11 +245,10 @@ def view_album_dialog():
                 
                 thumb_path = p.thumbnail_path
                 img_src = "https://placehold.co/100x100?text=?"
-                if thumb_path and os.path.exists(thumb_path):
-                    with open(thumb_path, "rb") as f:
-                        import base64
-                        b64 = base64.b64encode(f.read()).decode('utf-8')
-                        img_src = f"data:image/jpeg;base64,{b64}"
+                
+                cached_src = get_cached_thumbnail(thumb_path)
+                if cached_src:
+                    img_src = cached_src
                 
                 people_urls.append(img_src)
                 people_titles.append(f"{p.label}{' (Current)' if is_current else ''}")
@@ -206,6 +276,19 @@ def view_album_dialog():
                     
     # 2. GRID VIEW
     else:
+        # Check for CSS polish injection
+        st.markdown("""
+        <style>
+        img {
+            transition: transform 0.2s ease;
+        }
+        img:hover {
+            transform: scale(1.05);
+            opacity: 1 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         # Header with Editable Name & Close
         c1, c2 = st.columns([8, 2])
         with c1:
@@ -240,23 +323,28 @@ def view_album_dialog():
         album_titles = []
         
         for fname in filenames:
-            img_bytes = file_handler.get_image(fname)
+            # Try to get existing thumbnail (Fastest)
+            img_bytes = file_handler.get_thumbnail_image(fname)
+            
+            # Fallback to creating on fly if missing (e.g. old uploads)
+            if not img_bytes:
+                 img_bytes = file_handler.get_image(fname)
+                 # If we have to resize here, it's slow. But new flow ensures thumbs exist.
+                 if img_bytes:
+                     # Resize on fly fallback
+                    from utils.image_utils import decode_image
+                    img_cv = decode_image(img_bytes)
+                    if img_cv is not None:
+                        img_small = cv2.resize(img_cv, (300, 300))
+                        _, buffer = cv2.imencode('.jpg', img_small)
+                        img_bytes = buffer.tobytes()
+
             if img_bytes:
-                from utils.image_utils import decode_image
-                img_cv = decode_image(img_bytes)
-                if img_cv is not None:
-                     # Resize for grid
-                    img_small = cv2.resize(img_cv, (200, 200)) # Simple resize
-                    
-                    _, buffer = cv2.imencode('.jpg', img_small)
-                    import base64
-                    b64 = base64.b64encode(buffer).decode('utf-8')
-                    img_src = f"data:image/jpeg;base64,{b64}"
-                    album_urls.append(img_src)
-                    album_titles.append(fname)
-                else:
-                    album_urls.append("https://placehold.co/200x200?text=Error")
-                    album_titles.append("Error")
+                import base64
+                b64 = base64.b64encode(img_bytes).decode('utf-8')
+                img_src = f"data:image/jpeg;base64,{b64}"
+                album_urls.append(img_src)
+                album_titles.append(fname)
             else:
                  album_urls.append("https://placehold.co/200x200?text=Missing")
                  album_titles.append("Missing")
@@ -272,7 +360,9 @@ def view_album_dialog():
                 },
                 img_style={
                     "width": "100%", 
-                    "height": "auto", 
+                    "height": "100%", # Fill grid
+                    "aspect-ratio": "1 / 1", 
+                    "object-fit": "cover",
                     "border-radius": "5px", 
                     "cursor": "pointer"
                 }
@@ -282,9 +372,7 @@ def view_album_dialog():
                 st.session_state.album_selected_image = filenames[clicked_photo]
                 st.rerun()
             
-            if clicked_photo > -1:
-                st.session_state.album_selected_image = filenames[clicked_photo]
-                st.rerun()
+
 
 
 @st.dialog("Unidentified Photos", width="large")

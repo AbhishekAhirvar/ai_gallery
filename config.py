@@ -8,7 +8,7 @@ All configurable constants in one place for easy tuning.
 
 
 # Image Processing
-MAX_IMAGE_SIZE = 640  # Longest side in pixels
+MAX_IMAGE_SIZE = 1280  # Longest side in pixels
 
 # DBSCAN Clustering
 DBSCAN_EPS = 0.7  # Increased to merge duplicates better

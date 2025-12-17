@@ -12,6 +12,7 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
 from config import SUPPORTED_IMAGE_EXTENSIONS
+from utils.image_utils import decode_image, resize_image, encode_image
 
 
 @dataclass
@@ -32,7 +33,43 @@ class FileHandler:
     
     def __init__(self):
         self._temp_dir: Optional[str] = None
-        self._image_store: Dict[str, bytes] = {}
+        self._image_store: Dict[str, bytes] = {} # Original 
+        self._thumb_store: Dict[str, bytes] = {} # 300px for grid
+
+    def store_derived_images(self, filename: str, medium_data: Optional[bytes], thumb_data: bytes):
+        """Store resizing versions of the image. medium_data is ignored now."""
+        # Lazy init for hot-reload safety
+        if not hasattr(self, '_thumb_store'): self._thumb_store = {}
+        
+        if thumb_data:
+            self._thumb_store[filename] = thumb_data
+
+    def get_medium_image(self, filename: str) -> Optional[bytes]:
+        """Get best resolution for viewing. Now returns Original as Medium generation is skipped."""
+        return self.get_image(filename)
+
+    def get_thumbnail_image(self, filename: str) -> Optional[bytes]:
+        """Get 300px version. Generates on fly if missing."""
+        if not hasattr(self, '_thumb_store'): self._thumb_store = {}
+        
+        # Try cache
+        if filename in self._thumb_store:
+            return self._thumb_store[filename]
+            
+        # Lazy generate
+        original = self.get_image(filename)
+        if original:
+            try:
+                img = decode_image(original)
+                if img is not None:
+                    img_thumb = resize_image(img, max_size=300)
+                    thumb_data = encode_image(img_thumb)
+                    self._thumb_store[filename] = thumb_data
+                    return thumb_data
+            except Exception:
+                pass
+                
+        return None
     
     @property
     def temp_dir(self) -> str:
