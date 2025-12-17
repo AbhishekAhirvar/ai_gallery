@@ -106,8 +106,12 @@ def process_photos(uploaded_files):
             img_thumb = resize_image(img, max_size=300)
             thumb_bytes = encode_image(img_thumb)
             
-            # Store derived versions (Only Thumb + Original now)
-            file_handler.store_derived_images(img_file.filename, None, thumb_bytes)
+            # 2. Medium (1280px) - For detail view
+            img_medium = resize_image(img, max_size=1280)
+            medium_bytes = encode_image(img_medium)
+            
+            # Store derived versions
+            file_handler.store_derived_images(img_file.filename, medium_bytes, thumb_bytes)
             
             # 2. Model Detection
             # Use config driven size

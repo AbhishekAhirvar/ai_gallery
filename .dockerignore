@@ -1,0 +1,23 @@
+# Version Control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencies
+venv
+.env
+env/
+
+# Data (Don't copy heavy data to the container)
+data/
+downloads/
+temp/
+*.zip
+
+# OS
+.DS_Store
