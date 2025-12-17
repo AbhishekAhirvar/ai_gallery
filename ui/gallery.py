@@ -70,90 +70,77 @@ def render_gallery(
     </style>
     """, unsafe_allow_html=True)
 
+    # Logic for Flat Navigation (Replaces Modals)
     if st.session_state.get('active_album_cluster'):
-        # Ensure we are viewing the correct cluster object (sync with list)
-        label = st.session_state.active_album_cluster.label
-        current = next((c for c in clusters if c.label == label), st.session_state.active_album_cluster)
-        st.session_state.active_album_cluster = current
-        view_album_dialog()
+        render_album_view(clusters)
+    elif st.session_state.get('active_unidentified'):
+        render_unidentified_view(unidentified_filenames, unclustered_embeddings, file_handler)
+    else:
+        # --- MAIN GALLERY VIEW ---
         
-    if st.session_state.get('active_unidentified'):
-        view_unidentified_album(unidentified_filenames, unclustered_embeddings, file_handler)
-
-
-    # Top stats
-    total_people = len(clusters)
-    total_photos = len(file_handler.get_all_images())
-    
-    st.markdown(f"### 📸 **{total_people} People** found in {total_photos} photos")
-    
-    # --- Reset Action ---
-    if st.button("🔄 Start Over", type="secondary"):
-        st.session_state.clear()
-        st.rerun()
-    st.markdown("---")
-    
-    # --- People Grid ---
-    if not clusters and not unidentified_filenames:
-        st.info("No people found.")
-        return
-
-    # Prepare data using Cache
-    # We pass simple types (tuples) to be friendly to hashing
-    cluster_info = [(c.label, c.thumbnail_path, len(c.filenames)) for c in clusters]
-    images_urls, labels = _get_grid_data(cluster_info)
-
-    # Render grid using clickable_images
-    # OPTIMIZATION: If Modal is open, DO NOT render the heavy grid background.
-    # This saves massive bandwidth and fixes the "stuck loading" issue during navigation.
-    if st.session_state.get('active_album_cluster') or st.session_state.get('active_unidentified'):
-        st.info("Viewing Album... (Background hidden for performance)")
-    elif images_urls:
-        clicked_index = clickable_images(
-            images_urls, 
-            titles=labels,
-            div_style={
-                "display": "grid",
-                "grid-template-columns": "repeat(auto-fill, minmax(150px, 1fr))",
-                "grid-gap": "20px",
-                "justify-items": "center"
-            },
-            img_style={
-                "width": "150px",
-                "height": "150px",
-                "object-fit": "cover",
-                "border-radius": "50%",
-                "border": "3px solid #ff4b4b",
-                "cursor": "pointer"
-            }
-        )
+        # Top stats
+        total_people = len(clusters)
+        total_photos = len(file_handler.get_all_images())
         
-        if clicked_index > -1:
-            st.session_state.active_album_cluster = clusters[clicked_index]
-            st.session_state.album_selected_image = None
-            st.session_state.active_unidentified = False
+        st.markdown(f"### 📸 **{total_people} People** found in {total_photos} photos")
+        
+        # --- Reset Action ---
+        if st.button("🔄 Start Over", type="secondary"):
+            st.session_state.clear()
             st.rerun()
-        
-        if clicked_index > -1:
-            st.session_state.active_album_cluster = clusters[clicked_index]
-            st.session_state.album_selected_image = None
-            st.session_state.active_unidentified = False
-            st.rerun()
-            
-    # Unidentified Section
-    if unidentified_filenames:
         st.markdown("---")
-        if st.button(f"📂 View Unidentified Photos ({len(unidentified_filenames)})"):
-            st.session_state.active_unidentified = True
-            st.session_state.active_album_cluster = None
-            st.rerun()
+        
+        # --- People Grid ---
+        if not clusters and not unidentified_filenames:
+            st.info("No people found.")
+            return
+
+        # Prepare data using Cache
+        # We pass simple types (tuples) to be friendly to hashing
+        cluster_info = [(c.label, c.thumbnail_path, len(c.filenames)) for c in clusters]
+        images_urls, labels = _get_grid_data(cluster_info)
+
+        # Render grid using clickable_images
+        if images_urls:
+            clicked_index = clickable_images(
+                images_urls, 
+                titles=labels,
+                div_style={
+                    "display": "grid",
+                    "grid-template-columns": "repeat(auto-fill, minmax(150px, 1fr))",
+                    "grid-gap": "20px",
+                    "justify-items": "center"
+                },
+                img_style={
+                    "width": "150px",
+                    "height": "150px",
+                    "object-fit": "cover",
+                    "border-radius": "50%",
+                    "border": "3px solid #ff4b4b",
+                    "cursor": "pointer"
+                }
+            )
+            
+            if clicked_index > -1:
+                st.session_state.active_album_cluster = clusters[clicked_index]
+                st.session_state.album_selected_image = None
+                st.session_state.active_unidentified = False
+                st.rerun()
+                
+        # Unidentified Section
+        if unidentified_filenames:
+            st.markdown("---")
+            if st.button(f"📂 View Unidentified Photos ({len(unidentified_filenames)})"):
+                st.session_state.active_unidentified = True
+                st.session_state.active_album_cluster = None
+                st.rerun()
 
 
-@st.dialog("Person Album", width="large")
-def view_album_dialog():
+
+# Changed from @st.dialog to regular function
+def render_album_view(clusters: List[PersonCluster]):
     """
-    Stateful dialog that can navigate between people and photos.
-    Requires: st.session_state.active_album_cluster
+    Render the album view as a full 'page' instead of a dialog.
     """
     if 'active_album_cluster' not in st.session_state or not st.session_state.active_album_cluster:
         st.error("No album selected.")
@@ -316,7 +303,7 @@ def view_album_dialog():
                 cluster.label = new_name
                 st.rerun()
                 
-        if c2.button("✖ Close"):
+        if c2.button("✖ Back to Gallery"):
             st.session_state.active_album_cluster = None
             st.rerun()
         
@@ -392,16 +379,76 @@ def view_album_dialog():
 
 
 
-@st.dialog("Unidentified Photos", width="large")
-@st.dialog("Unidentified Photos", width="large")
-def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[FaceEmbedding], file_handler: FileHandler):
+
+def get_context_face_image(file_handler, filename: str, facial_area: Dict) -> Optional[str]:
+    """Helper to draw a box on the FULL image for the naming UI (scaled down for display)."""
+    try:
+        # Load full image
+        img_bytes = file_handler.get_image_bytes(filename)
+        if not img_bytes:
+            return None
+            
+        from utils.image_utils import decode_image
+        img = decode_image(image_bytes=img_bytes)
+        if img is None:
+            return None
+            
+        h_orig, w_orig = img.shape[:2]
+        max_dim = max(h_orig, w_orig)
+        
+        # We want to display the full image, but resized to something reasonable for the card
+        # e.g. Max 400px
+        display_size = 400
+        scale_display = display_size / max_dim if max_dim > display_size else 1.0
+        
+        # Resize for display
+        new_w = int(w_orig * scale_display)
+        new_h = int(h_orig * scale_display)
+        img_display = cv2.resize(img, (new_w, new_h))
+        
+        # Now we need to draw the box.
+        # The facial_area comes from detection on a Max-1280 image.
+        # We need to scale facial_area to our display image.
+        
+        # 1. Scale factor from Detection-Image (1280) to Original-Image
+        scale_det_to_orig = max_dim / 1280.0
+        
+        # 2. Scale factor from Original-Image to Display-Image
+        # scale_display (already calculated)
+        
+        # Total scale factor from Detection Coords -> Display Coords
+        total_scale = scale_det_to_orig * scale_display
+        
+        fx = int(facial_area['x'] * total_scale)
+        fy = int(facial_area['y'] * total_scale)
+        fw = int(facial_area['w'] * total_scale)
+        fh = int(facial_area['h'] * total_scale)
+        
+        # Draw Box
+        cv2.rectangle(img_display, (fx, fy), (fx + fw, fy + fh), (0, 0, 255), 2)
+        
+        # Encode
+        _, buffer = cv2.imencode('.jpg', img_display)
+        import base64
+        b64 = base64.b64encode(buffer).decode('utf-8')
+        return f"data:image/jpeg;base64,{b64}"
+        
+    except Exception as e:
+        print(f"Error creating context image: {e}")
+        return None
+
+# Changed from @st.dialog to regular function
+def render_unidentified_view(filenames: List[str], unclustered_embeddings: List[FaceEmbedding], file_handler: FileHandler):
     """
-    Modal dialog for unidentified photos with overlay boxes and naming.
+    Page for unidentified photos with overlay boxes and naming.
     """
     c1, c2 = st.columns([8, 2])
     c1.header("Unidentified Photos")
-    if c2.button("✖ Close", key="close_unidentified"):
+    
+    # "Close" logic -> Return to Main
+    if c2.button("✖ Back to Gallery", key="close_unidentified"):
         st.session_state.active_unidentified = False
+        st.session_state.active_album_cluster = None
         st.rerun()
     
     st.info("🟥 Red boxes indicate faces that were detected but not grouped.")
@@ -413,7 +460,7 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
         data=zip_buf,
         file_name="unidentified.zip",
         mime="application/zip",
-        use_container_width=True
+        use_container_width=False
     )
     
     st.divider()
@@ -435,9 +482,19 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
         for idx, fe in enumerate(sorted_faces):
             col = cols[idx % 4]
             with col:
-                # Show thumb
-                if fe.thumbnail_path and os.path.exists(fe.thumbnail_path):
-                     # Read file directly
+                # GENERATE CONTEXT IMAGE (Bigger with Box)
+                # If fail, fallback to thumbnail path
+                context_img_src = None
+                
+                # Try generate fresh context crop
+                if fe.filename and fe.facial_area:
+                     context_img_src = get_context_face_image(file_handler, fe.filename, fe.facial_area)
+                
+                # Render Image
+                if context_img_src:
+                     st.markdown(f'<img src="{context_img_src}" style="width:100%; border-radius:5px; border: 1px solid #ddd;">', unsafe_allow_html=True)
+                elif fe.thumbnail_path and os.path.exists(fe.thumbnail_path):
+                     # Fallback
                     with open(fe.thumbnail_path, "rb") as f:
                         import base64
                         b64 = base64.b64encode(f.read()).decode('utf-8')
@@ -458,13 +515,15 @@ def view_unidentified_album(filenames: List[str], unclustered_embeddings: List[F
                 fe = sorted_faces[idx]
                 
                 # Check if cluster exists
-                target_cluster = next((c for c in clusters if c.label.lower() == new_name.lower()), None)
+                target_cluster = next((c for c in clusters if c.label.lower().strip() == new_name.lower().strip()), None)
                 
                 if target_cluster:
                     # Add to existing
                     if fe.filename not in target_cluster.filenames:
                         target_cluster.filenames.append(fe.filename)
-                    target_cluster.embeddings.append(fe)
+                    # Don't add if the EXACT same embedding object is already there
+                    if fe not in target_cluster.embeddings:
+                        target_cluster.embeddings.append(fe)
                 else:
                     # Create new
                     new_cluster = PersonCluster(
