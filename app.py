@@ -132,6 +132,7 @@ def process_photos(uploaded_files):
         # "Unidentified" view will need to handle both:
         # A) Images with faces that weren't clustered (draw boxes)
         # B) Images with NO faces (just show image)
+        #test
         
         unclustered_filenames = list(set([fe.filename for fe in unclustered_embeddings]))
         final_unidentified_filenames = list(set(no_face_images + unclustered_filenames))
