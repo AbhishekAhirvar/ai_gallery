@@ -95,28 +95,34 @@ def process_photos(uploaded_files):
             file_handler.store_image(img_file.filename, img_file.data)
             
             # Decode using robust utils
-            from utils.image_utils import decode_image, resize_image
+            from utils.image_utils import decode_image, resize_image, encode_image
             
             img = decode_image(img_file.data)
             if img is None:
                 continue
             
-            # Use raw size for detection typically for small faces, 
-            # or resize if too massive to save RAM. InsightFace is robust.
-            # config.MAX_IMAGE_SIZE might be too small for groups.
-            # Let's trust InsightFace's internal resizing or pass meaningful size.
-            # The user wants "best" so let's use a decent size or original.
-            # But large images = slow. Let's resize slightly if huge (e.g. >1600px)
-            # For now, sticking to utils resize but maybe bumping limit or keep existing.
+            # --- Image Optimization Phase ---
+            # 1. Thumb (300px) - Keep this for fast gallery grid
+            img_thumb = resize_image(img, max_size=300)
+            thumb_bytes = encode_image(img_thumb)
             
-            img_processed = resize_image(img, max_size=1280) # Increased for better group detection
+            # Store derived versions (Only Thumb + Original now)
+            file_handler.store_derived_images(img_file.filename, None, thumb_bytes)
             
-            embeddings = detector.extract_embeddings(img_processed, img_file.filename)
+            # 2. Model Detection
+            # Use config driven size
+            from config import MAX_IMAGE_SIZE
+            img_det = resize_image(img, max_size=MAX_IMAGE_SIZE)
+            
+            embeddings = detector.extract_embeddings(img_det, img_file.filename)
             
             if embeddings:
                 all_embeddings.extend(embeddings)
             else:
                 no_face_images.append(img_file.filename)
+            
+            # Free memory
+            del img, img_thumb, img_det
         
         # 3. Cluster
         status_text.text("Grouping faces...")
