@@ -9,7 +9,6 @@ import base64
 import io
 from typing import Optional
 from PIL import Image, ImageOps
-
 from config import MAX_IMAGE_SIZE
 
 
@@ -20,12 +19,11 @@ def resize_image(img: np.ndarray, max_size: int = MAX_IMAGE_SIZE) -> np.ndarray:
     Args:
         img: OpenCV image (BGR format)
         max_size: Maximum size for longest dimension
-        
+    
     Returns:
         Resized image
     """
     h, w = img.shape[:2]
-    
     if max(h, w) <= max_size:
         return img
     
@@ -39,16 +37,25 @@ def resize_image(img: np.ndarray, max_size: int = MAX_IMAGE_SIZE) -> np.ndarray:
     return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 
-def decode_image(file_bytes: bytes) -> Optional[np.ndarray]:
+def decode_image(file_bytes: bytes = None, image_bytes: bytes = None) -> Optional[np.ndarray]:
     """
     Decode image from bytes, handling EXIF orientation.
     
+    Accepts either `file_bytes` or `image_bytes` for backward compatibility.
+    
     Args:
-        file_bytes: Raw image bytes
-        
+        file_bytes: Raw image bytes (preferred parameter name)
+        image_bytes: Alternative name for raw image bytes
+    
     Returns:
         OpenCV image (BGR) or None if decoding fails
     """
+    # Normalize argument name for backward compatibility
+    if file_bytes is None and image_bytes is not None:
+        file_bytes = image_bytes
+    if file_bytes is None:
+        return None
+    
     try:
         # Use PIL to handle EXIF rotation automatically
         image = Image.open(io.BytesIO(file_bytes))
@@ -63,7 +70,7 @@ def decode_image(file_bytes: bytes) -> Optional[np.ndarray]:
             img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
         else:  # RGB
             img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-            
+        
         return img_bgr
     except Exception:
         # Fallback to pure OpenCV if PIL fails
@@ -82,7 +89,7 @@ def encode_image(img: np.ndarray, format: str = '.jpg') -> bytes:
     Args:
         img: OpenCV image
         format: Image format extension
-        
+    
     Returns:
         Encoded image bytes
     """
@@ -97,7 +104,7 @@ def encode_image_to_base64(img: np.ndarray, format: str = '.jpg') -> str:
     Args:
         img: OpenCV image
         format: Image format extension
-        
+    
     Returns:
         Base64 string ready for HTML img src
     """
