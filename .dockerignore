@@ -12,12 +12,15 @@ __pycache__
 venv
 .env
 env/
+.venv/
+*/.venv/
+
 
 # Data (Don't copy heavy data to the container)
 data/
 downloads/
 temp/
 *.zip
-
+thumbnails/
 # OS
 .DS_Store
