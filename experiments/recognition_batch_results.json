@@ -1,0 +1,42 @@
+[
+  {
+    "batch_size": 8,
+    "images": 50,
+    "faces": 192,
+    "time": 2.617,
+    "throughput": 19.1,
+    "success": true
+  },
+  {
+    "batch_size": 12,
+    "images": 50,
+    "faces": 192,
+    "time": 2.144,
+    "throughput": 23.32,
+    "success": true
+  },
+  {
+    "batch_size": 16,
+    "images": 50,
+    "faces": 192,
+    "time": 2.035,
+    "throughput": 24.57,
+    "success": true
+  },
+  {
+    "batch_size": 24,
+    "images": 50,
+    "faces": 192,
+    "time": 2.182,
+    "throughput": 22.91,
+    "success": true
+  },
+  {
+    "batch_size": 32,
+    "images": 50,
+    "faces": 192,
+    "time": 2.007,
+    "throughput": 24.92,
+    "success": true
+  }
+]

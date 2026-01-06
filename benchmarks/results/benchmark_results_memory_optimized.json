@@ -1,0 +1,35 @@
+{
+  "benchmark": {
+    "images": 1000,
+    "stream_batch_size": 100,
+    "faces": 1790,
+    "clusters": 235,
+    "unclustered": 0,
+    "total_time": 231.3580083847046,
+    "detection_time": 29.675440549850464,
+    "clustering_time": 1.1970913410186768,
+    "throughput": 4.32230553410189
+  },
+  "resources": {
+    "samples_collected": 460,
+    "duration_seconds": 231.3214235305786,
+    "cpu": {
+      "global_avg": 26.765217391304347,
+      "global_max": 53.6,
+      "process_avg": 109.55565217391306,
+      "process_max": 125.5
+    },
+    "ram": {
+      "process_avg_mb": 1853.415480638587,
+      "process_max_mb": 2111.140625
+    },
+    "gpu": [
+      {
+        "utilization_avg": 13.458695652173914,
+        "utilization_max": 89,
+        "memory_used_avg_mb": 2959.4786684782607,
+        "memory_used_max_mb": 3017.375
+      }
+    ]
+  }
+}

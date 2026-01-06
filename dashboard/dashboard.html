@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="VowScan AI Gallery Dashboard - Advanced face recognition and clustering analytics for wedding photography">
+    <meta name="keywords" content="AI, face recognition, photo gallery, wedding photos, analytics dashboard">
+    <title>VowScan - AI Gallery Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="background-gradient"></div>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- Header Section -->
+        <header class="header">
+            <div class="logo-section">
+                <div class="logo-icon">💒</div>
+                <div class="logo-text">
+                    <h1>VowScan</h1>
+                    <p class="tagline">AI-Powered Gallery Intelligence</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-secondary" id="refreshBtn">
+                    <span class="icon">🔄</span>
+                    Refresh
+                </button>
+                <button class="btn-primary" id="settingsBtn">
+                    <span class="icon">⚙️</span>
+                    Settings
+                </button>
+            </div>
+        </header>
+
+        <!-- Hero Stats Section -->
+        <section class="hero-stats">
+            <div class="stat-card card-glass" data-tilt>
+                <div class="stat-icon stat-icon-primary">📸</div>
+                <div class="stat-content">
+                    <h3 class="stat-value" data-target="12847">0</h3>
+                    <p class="stat-label">Total Images</p>
+                    <div class="stat-trend trend-up">
+                        <span class="trend-icon">↗</span>
+                        <span class="trend-value">+23.5%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card card-glass" data-tilt>
+                <div class="stat-icon stat-icon-success">👤</div>
+                <div class="stat-content">
+                    <h3 class="stat-value" data-target="45623">0</h3>
+                    <p class="stat-label">Faces Detected</p>
+                    <div class="stat-trend trend-up">
+                        <span class="trend-icon">↗</span>
+                        <span class="trend-value">+18.2%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card card-glass" data-tilt>
+                <div class="stat-icon stat-icon-info">👥</div>
+                <div class="stat-content">
+                    <h3 class="stat-value" data-target="287">0</h3>
+                    <p class="stat-label">Person Clusters</p>
+                    <div class="stat-trend trend-neutral">
+                        <span class="trend-icon">→</span>
+                        <span class="trend-value">Stable</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card card-glass" data-tilt>
+                <div class="stat-icon stat-icon-warning">⚡</div>
+                <div class="stat-content">
+                    <h3 class="stat-value" data-target="42">0</h3>
+                    <p class="stat-label">Img/Second</p>
+                    <div class="stat-trend trend-up">
+                        <span class="trend-icon">↗</span>
+                        <span class="trend-value">+12.8%</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+
+            <!-- Left Column -->
+            <div class="left-column">
+
+                <!-- Processing Performance Chart -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📊</span>
+                            Processing Performance
+                        </h2>
+                        <select class="time-selector" id="perfTimeRange">
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d" selected>Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Face Detection Distribution -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">🎯</span>
+                            Detection Distribution
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="distributionChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column -->
+            <div class="right-column">
+
+                <!-- Gallery Preview -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">🖼️</span>
+                            Recent Clusters
+                        </h2>
+                        <a href="#" class="card-link">View All →</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="gallery-grid" id="galleryPreview">
+                            <!-- Gallery items will be injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing Timeline -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">⏱️</span>
+                            Recent Activity
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="timeline" id="activityTimeline">
+                            <!-- Timeline items will be injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">⚡</span>
+                            Quick Actions
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="action-grid">
+                            <button class="action-btn action-primary">
+                                <span class="action-icon">📤</span>
+                                <span class="action-label">Upload Photos</span>
+                            </button>
+                            <button class="action-btn action-success">
+                                <span class="action-icon">🔄</span>
+                                <span class="action-label">Re-cluster</span>
+                            </button>
+                            <button class="action-btn action-info">
+                                <span class="action-icon">📥</span>
+                                <span class="action-label">Export Data</span>
+                            </button>
+                            <button class="action-btn action-warning">
+                                <span class="action-icon">🗑️</span>
+                                <span class="action-label">Clear Cache</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Benchmark Metrics -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">⚡</span>
+                            Benchmark (1000 Images)
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="system-metrics">
+                            <div class="metric-row">
+                                <div class="metric-label">
+                                    <span class="metric-icon">⏱️</span>
+                                    Processing Time
+                                </div>
+                                <div class="metric-value">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-success" style="width: 89%"></div>
+                                    </div>
+                                    <span class="metric-text">214 seconds</span>
+                                </div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">
+                                    <span class="metric-icon">🚀</span>
+                                    Throughput
+                                </div>
+                                <div class="metric-value">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 12%"></div>
+                                    </div>
+                                    <span class="metric-text">4.7 img/sec</span>
+                                </div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">
+                                    <span class="metric-icon">💾</span>
+                                    Peak RAM
+                                </div>
+                                <div class="metric-value">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-success" style="width: 17%"></div>
+                                    </div>
+                                    <span class="metric-text">2.7 GB</span>
+                                </div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">
+                                    <span class="metric-icon">🎮</span>
+                                    GPU Memory
+                                </div>
+                                <div class="metric-value">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-success" style="width: 38%"></div>
+                                    </div>
+                                    <span class="metric-text">3.0 / 8 GB</span>
+                                </div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">
+                                    <span class="metric-icon">🧠</span>
+                                    CPU Cores Used
+                                </div>
+                                <div class="metric-value">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 100%"></div>
+                                    </div>
+                                    <span class="metric-text">4 cores</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>VowScan AI Gallery Dashboard © 2025 | Powered by Advanced Face Recognition AI</p>
+            <p class="footer-meta">Last updated: <span id="lastUpdated">Just now</span></p>
+        </footer>
+
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="dashboard.js"></script>
+</body>
+
+</html>

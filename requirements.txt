@@ -15,7 +15,14 @@ ml-dtypes==0.5.3
 
 # Image Processing
 Pillow==12.0.0
+PyTurboJPEG>=1.7.0  # Fast JPEG decoding (2-3x faster than PIL)
+exifread>=3.0.0     # EXIF orientation handling for TurboJPEG
 
 ## ONNX Runtime - if you are not using docker to run program use one of below
 #onnxruntime==1.23.2      # CPU image ke liye
-#onnxruntime-gpu==1.23.2  # GPU image ke liye
+onnxruntime-gpu==1.20.1
+hdbscan>=0.8.33
+
+# System Monitoring
+psutil
+pynvml

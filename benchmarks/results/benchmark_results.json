@@ -1,0 +1,10 @@
+[
+  {
+    "images": 1000,
+    "faces": 1790,
+    "total_time": 29.738362550735474,
+    "detection_time": 28.543694972991943,
+    "clustering_time": 1.1946499347686768,
+    "throughput": 33.6265992552192
+  }
+]

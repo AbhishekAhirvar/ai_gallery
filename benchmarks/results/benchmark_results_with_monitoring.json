@@ -1,0 +1,35 @@
+{
+  "benchmark": {
+    "images": 1000,
+    "faces": 1790,
+    "clusters": 190,
+    "unclustered": 0,
+    "total_time": 30.021347761154175,
+    "detection_time": 28.774402379989624,
+    "clustering_time": 1.2469210624694824,
+    "throughput": 33.30963046548963
+  },
+  "resources": {
+    "samples_collected": 59,
+    "duration_seconds": 29.989840507507324,
+    "cpu": {
+      "global_avg": 29.576271186440675,
+      "global_max": 64.4,
+      "global_min": 19.7,
+      "process_avg": 115.98813559322035,
+      "process_max": 237.2
+    },
+    "ram": {
+      "global_avg_gb": 20.721924927275058,
+      "global_max_gb": 20.827938079833984,
+      "global_avg_percent": 66.22881355932203,
+      "global_max_percent": 66.6,
+      "process_avg_mb": 8867.216565148305,
+      "process_max_mb": 8916.48828125
+    },
+    "gpu": [
+      {
+        "id": 0,
+        "name": "NVIDIA GeForce GTX 1650",
+        "utilization_avg": 76.67796610169492,
+        "utilization_max": 

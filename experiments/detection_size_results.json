@@ -1,0 +1,38 @@
+[
+  {
+    "det_size": 640,
+    "images": 50,
+    "faces": 192,
+    "time": 8.113,
+    "throughput": 6.16,
+    "ms_per_image": 162.3,
+    "success": true
+  },
+  {
+    "det_size": 480,
+    "images": 50,
+    "faces": 175,
+    "time": 7.062,
+    "throughput": 7.08,
+    "ms_per_image": 141.2,
+    "success": true
+  },
+  {
+    "det_size": 384,
+    "images": 50,
+    "faces": 156,
+    "time": 6.727,
+    "throughput": 7.43,
+    "ms_per_image": 134.5,
+    "success": true
+  },
+  {
+    "det_size": 320,
+    "images": 50,
+    "faces": 148,
+    "time": 6.142,
+    "throughput": 8.14,
+    "ms_per_image": 122.8,
+    "success": true
+  }
+]

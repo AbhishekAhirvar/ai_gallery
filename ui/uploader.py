@@ -16,7 +16,7 @@ def render_upload_section() -> Optional[List]:
     """
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
     st.markdown("### 📤 Upload Your Wedding Photos")
-    st.markdown("Upload a ZIP file or multiple images (up to 1000 photos). Supported formats: JPG, JPEG, PNG")
+    st.markdown("Upload a ZIP file or multiple images. Supported formats: JPG, JPEG, PNG")
     
     uploaded_files = st.file_uploader(
         "Drag and drop files here",

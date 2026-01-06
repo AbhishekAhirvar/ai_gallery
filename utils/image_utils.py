@@ -41,6 +41,8 @@ def decode_image(file_bytes: bytes = None, image_bytes: bytes = None) -> Optiona
     """
     Decode image from bytes, handling EXIF orientation.
     
+    Uses TurboJPEG for JPEG files (2-3x faster) and PIL for other formats.
+    
     Accepts either `file_bytes` or `image_bytes` for backward compatibility.
     
     Args:
@@ -56,30 +58,11 @@ def decode_image(file_bytes: bytes = None, image_bytes: bytes = None) -> Optiona
     if file_bytes is None:
         return None
     
-    try:
-        # Use PIL to handle EXIF rotation automatically
-        image = Image.open(io.BytesIO(file_bytes))
-        image = ImageOps.exif_transpose(image)
-        
-        # Convert to OpenCV format (RGB -> BGR)
-        img_np = np.array(image)
-        
-        if len(img_np.shape) == 2:  # Grayscale
-            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-        elif img_np.shape[2] == 4:  # RGBA
-            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
-        else:  # RGB
-            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-        
-        return img_bgr
-    except Exception:
-        # Fallback to pure OpenCV if PIL fails
-        try:
-            nparr = np.frombuffer(file_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            return img
-        except:
-            return None
+    # Import TurboJPEG decoder  
+    from utils.turbo_decoder import decode_image_smart
+    
+    # Use smart decoder (TurboJPEG for JPEG, PIL for others)
+    return decode_image_smart(file_bytes)
 
 
 def encode_image(img: np.ndarray, format: str = '.jpg') -> bytes:
@@ -87,13 +70,20 @@ def encode_image(img: np.ndarray, format: str = '.jpg') -> bytes:
     Encode image to bytes.
     
     Args:
-        img: OpenCV image
+        img: OpenCV image (BGR format)
         format: Image format extension
     
     Returns:
         Encoded image bytes
     """
-    _, buffer = cv2.imencode(format, img)
+    # Convert BGR to RGB before encoding for correct color in JPEG/PNG
+    # cv2.imencode doesn't auto-convert, it encodes whatever you give it
+    if len(img.shape) == 3 and img.shape[2] == 3:
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    else:
+        img_rgb = img
+    
+    _, buffer = cv2.imencode(format, img_rgb)
     return buffer.tobytes()
 
 
